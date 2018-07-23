@@ -112,11 +112,12 @@ airspy_source_c::airspy_source_c (const std::string &args)
   memset(version, 0, sizeof(version));
   ret = airspy_version_string_read( _dev, version, sizeof(version));
   AIRSPY_THROW_ON_ERROR(ret, "Failed to read version string")
-#if 0
   airspy_read_partid_serialno_t part_serial;
   ret = airspy_board_partid_serialno_read( _dev, &part_serial );
-  AIRSPY_THROW_ON_ERROR(ret, "Failed to read serial number")
-#endif
+  AIRSPY_THROW_ON_ERROR(ret, "Failed to read serial number");
+  char serial_number[17];
+  memset(serial_number, 0, sizeof(serial_number));
+  sprintf(serial_number, "%08X%08X", part_serial.serial_no[2], part_serial.serial_no[3]);
   uint32_t num_rates;
   airspy_get_samplerates(_dev, &num_rates, 0);
   uint32_t *samplerates = (uint32_t *) malloc(num_rates * sizeof(uint32_t));
@@ -129,7 +130,7 @@ airspy_source_c::airspy_source_c (const std::string &args)
    * to play nice with the monotonic requirement of meta-range later on */
   std::sort(_sample_rates.begin(), _sample_rates.end());
 
-  std::cerr << "Using " << version << ", samplerates: ";
+  std::cerr << "Using " << version << ", serial: 0x" << serial_number <<", samplerates: ";
 
   for (size_t i = 0; i < _sample_rates.size(); i++)
     std::cerr << boost::format("%gM ") % (_sample_rates[i].first / 1e6);
