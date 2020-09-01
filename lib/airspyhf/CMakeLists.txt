@@ -1,4 +1,4 @@
-# Copyright 2012 Free Software Foundation, Inc.
+# Copyright 2017 Free Software Foundation, Inc.
 #
 # This file is part of gr-osmosdr
 #
@@ -23,17 +23,15 @@
 
 target_include_directories(gnuradio-osmosdr PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${gnuradio-uhd_INCLUDE_DIRS}
-    ${UHD_INCLUDE_DIRS}
+    ${LIBAIRSPYHF_INCLUDE_DIRS}
 )
 
 APPEND_LIB_LIST(
-    gnuradio::gnuradio-uhd
-    ${UHD_LIBRARIES}
+    ${Gnuradio-blocks_LIBRARIES}
+    ${LIBAIRSPYHF_LIBRARIES}
 )
 
 list(APPEND gr_osmosdr_srcs
-    ${CMAKE_CURRENT_SOURCE_DIR}/uhd_sink_c.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/uhd_source_c.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/airspyhf_source_c.cc
 )
 set(gr_osmosdr_srcs ${gr_osmosdr_srcs} PARENT_SCOPE)

@@ -80,6 +80,10 @@
 #include <airspy_source_c.h>
 #endif
 
+#ifdef ENABLE_AIRSPYHF
+#include <airspyhf_source_c.h>
+#endif
+
 #ifdef ENABLE_SOAPY
 #include <soapy_source_c.h>
 #endif
@@ -92,13 +96,8 @@
 #include <freesrp_source_c.h>
 #endif
 
-
 #include "arg_helpers.h"
 #include "source_impl.h"
-
-/* This avoids throws in ctor of gr::hier_block2, as gnuradio is unable to deal
- with this behavior in a clean way. The GR maintainer Rondeau has been informed. */
-#define WORKAROUND_GR_HIER_BLOCK2_BUG
 
 /*
  * Create a new instance of source_impl and return
@@ -162,6 +161,9 @@ source_impl::source_impl( const std::string &args )
 #ifdef ENABLE_AIRSPY
   dev_types.push_back("airspy");
 #endif
+#ifdef ENABLE_AIRSPYHF
+  dev_types.push_back("airspyhf");
+#endif
 #ifdef ENABLE_SOAPY
   dev_types.push_back("soapy");
 #endif
@@ -177,7 +179,7 @@ source_impl::source_impl( const std::string &args )
   std::cerr << "built-in source types: ";
   BOOST_FOREACH(std::string dev_type, dev_types)
     std::cerr << dev_type << " ";
-  std::cerr << std::endl << std::flush;
+  std::cerr << std::endl;
 
 #ifdef ENABLE_RFSPACE
   dev_types.push_back("sdr-iq"); /* additional aliases for rfspace backend */
@@ -195,9 +197,7 @@ source_impl::source_impl( const std::string &args )
       }
     }
   }
-#ifdef WORKAROUND_GR_HIER_BLOCK2_BUG
-  try {
-#endif
+
   if ( ! device_specified ) {
     std::vector< std::string > dev_list;
 #ifdef ENABLE_OSMOSDR
@@ -240,6 +240,10 @@ source_impl::source_impl( const std::string &args )
     BOOST_FOREACH( std::string dev, airspy_source_c::get_devices() )
       dev_list.push_back( dev );
 #endif
+#ifdef ENABLE_AIRSPYHF
+    BOOST_FOREACH( std::string dev, airspyhf_source_c::get_devices() )
+      dev_list.push_back( dev );
+#endif
 #ifdef ENABLE_SOAPY
     BOOST_FOREACH( std::string dev, soapy_source_c::get_devices() )
       dev_list.push_back( dev );
@@ -260,7 +264,7 @@ source_impl::source_impl( const std::string &args )
     if ( dev_list.size() )
       arg_list.push_back( dev_list.front() );
     else
-      throw std::runtime_error("No supported devices found to pick from.");
+      throw std::runtime_error("No supported devices found (check the connection and/or udev rules).");
   }
 
   BOOST_FOREACH(std::string arg, arg_list) {
@@ -362,6 +366,13 @@ source_impl::source_impl( const std::string &args )
     }
 #endif
 
+#ifdef ENABLE_AIRSPYHF
+    if ( dict.count("airspyhf") ) {
+      airspyhf_source_c_sptr src = make_airspyhf_source_c( arg );
+      block = src; iface = src.get();
+    }
+#endif
+
 #ifdef ENABLE_SOAPY
     if ( dict.count("soapy") ) {
       soapy_source_c_sptr src = make_soapy_source_c( arg );
@@ -410,35 +421,6 @@ source_impl::source_impl( const std::string &args )
 
   if (!_devs.size())
     throw std::runtime_error("No devices specified via device arguments.");
-#ifdef WORKAROUND_GR_HIER_BLOCK2_BUG
-  } catch ( std::exception &ex ) {
-    std::cerr << std::endl << "FATAL: " << ex.what() << std::endl << std::endl;
-
-    /* we try to prevent the whole application from crashing by faking
-     * the missing hardware (channels) with null sourc(e) */
-
-    gr::blocks::null_source::sptr null_source = \
-        gr::blocks::null_source::make( sizeof(gr_complex) );
-
-    gr::blocks::throttle::sptr throttle = \
-        gr::blocks::throttle::make( sizeof(gr_complex), 1e5 );
-
-    connect(null_source, 0, throttle, 0);
-
-    size_t missing_chans = 0;
-    if ( output_signature()->max_streams() > 0 )
-      missing_chans = output_signature()->max_streams() - channel;
-
-    std::cerr << "Trying to fill up " << missing_chans
-              << " missing channel(s) with null source(s).\n"
-              << "This is being done to prevent the application from crashing\n"
-              << "due to gnuradio bug #528.\n"
-              << std::endl;
-
-    for (size_t i = 0; i < missing_chans; i++)
-      connect(throttle, 0, self(), channel++);
-  }
-#endif
 }
 
 size_t source_impl::get_num_channels()
@@ -508,7 +490,7 @@ double source_impl::set_sample_rate(double rate)
     _sample_rate = sample_rate;
   }
 
-  return sample_rate;
+  return _sample_rate;
 }
 
 double source_impl::get_sample_rate()
